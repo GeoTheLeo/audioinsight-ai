@@ -1,0 +1,65 @@
+
+===============================
+Cluster 0
+===============================
+Number of Products: 29
+
+Top Keywords:
+speaker, br, sound, great, good, speakers, bluetooth, quality, use, really
+
+Representative Products (ASIN + review_count):
+- B010OYASRG (19 reviews)
+- B016XTADG2 (16 reviews)
+- B01LZV6TYQ (8 reviews)
+
+===============================
+Cluster 1
+===============================
+Number of Products: 20
+
+Top Keywords:
+br, bluetooth, use, great, speaker, like, car, phone, music, radio
+
+Representative Products (ASIN + review_count):
+- B07VTK654B (9 reviews)
+- B00VWEK4IG (5 reviews)
+- B00I59VBH4 (4 reviews)
+
+===============================
+Cluster 2
+===============================
+Number of Products: 22
+
+Top Keywords:
+speakers, br, sound, tv, great, speaker, good, just, remote, computer
+
+Representative Products (ASIN + review_count):
+- B0791H74NT (10 reviews)
+- B0001FTVEK (6 reviews)
+- B08BJB2K7L (5 reviews)
+
+===============================
+Cluster 3
+===============================
+Number of Products: 53
+
+Top Keywords:
+br, headphones, sound, earbuds, great, quality, like, good, noise, use
+
+Representative Products (ASIN + review_count):
+- B07J2Z5DBM (15 reviews)
+- B07RGZ5NKS (9 reviews)
+- B003EM8008 (9 reviews)
+
+===============================
+Cluster 4
+===============================
+Number of Products: 18
+
+Top Keywords:
+br, echo, speaker, dot, alexa, great, use, amazon, sound, music
+
+Representative Products (ASIN + review_count):
+- B01DFKC2SO (16 reviews)
+- B015TJD0Y4 (11 reviews)
+- B07FZ8S74R (10 reviews)

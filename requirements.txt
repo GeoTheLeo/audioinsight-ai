@@ -1,0 +1,12 @@
+pandas
+pandas
+numpy
+scikit-learn
+matplotlib
+seaborn
+torch
+transformers
+datasets==2.19.1
+sentence-transformers
+gradio
+python-docx
