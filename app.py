@@ -30,7 +30,6 @@ and generative AI to deliver structured product intelligence.
 # -----------------------------
 # Load Data
 # -----------------------------
-@st.cache_data
 def load_data():
     return pd.read_csv("data/processed/ranked_products.csv")
 
