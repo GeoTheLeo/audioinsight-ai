@@ -22,18 +22,42 @@ st.markdown(
 3. Click **Generate Executive Report** for AI-powered analysis.
 4. Download the report as a professional PDF.
 
-This system combines sentiment modeling, product clustering, Bayesian ranking,
+This system combines sentiment modeling, clustering, Bayesian ranking,
 and generative AI to deliver structured product intelligence.
 """
 )
 
 # -----------------------------
-# Load Data
+# Load Data (No Cache — Safe)
 # -----------------------------
 def load_data():
-    return pd.read_csv("data/processed/ranked_products.csv")
+    try:
+        df = pd.read_csv("data/processed/ranked_products.csv")
+        return df
+    except Exception as e:
+        st.error("Error loading ranked_products.csv")
+        st.stop()
 
 df = load_data()
+
+# -----------------------------
+# Defensive Column Validation
+# -----------------------------
+required_columns = [
+    "cluster",
+    "cluster_rank",
+    "final_score",
+    "avg_rating",
+    "review_count",
+    "negative_ratio",
+    "asin",
+]
+
+missing_columns = [col for col in required_columns if col not in df.columns]
+
+if missing_columns:
+    st.error(f"Missing required columns: {missing_columns}")
+    st.stop()
 
 # -----------------------------
 # Human-Friendly Category Names
@@ -53,7 +77,7 @@ df["Category Name"] = df["cluster"].map(CATEGORY_MAP)
 # -----------------------------
 selected_category = st.selectbox(
     "Select Category:",
-    sorted(df["Category Name"].unique())
+    sorted(df["Category Name"].dropna().unique())
 )
 
 cluster_id = [
@@ -72,30 +96,39 @@ top_products = (
     cluster_df
     .sort_values("cluster_rank")
     .head(5)
+    .copy()
 )
 
-# Create display column
-top_products["Product"] = (
-    top_products["title"] + " (" + top_products["asin"] + ")"
-)
+# -----------------------------
+# Defensive Product Column Creation
+# -----------------------------
+if "title" in top_products.columns:
+    top_products["Product"] = (
+        top_products["title"].astype(str) + " (" +
+        top_products["asin"].astype(str) + ")"
+    )
+else:
+    # Fallback if title is missing
+    top_products["Product"] = top_products["asin"].astype(str)
 
-display_df = top_products[
-    [
-        "Product",
-        "final_score",
-        "avg_rating",
-        "review_count",
-        "negative_ratio",
-    ]
-].copy()
+# -----------------------------
+# Build Display DataFrame Safely
+# -----------------------------
+display_columns = {
+    "Product": "Product",
+    "final_score": "Score",
+    "avg_rating": "Avg Rating",
+    "review_count": "Reviews",
+    "negative_ratio": "Negative Ratio",
+}
 
-display_df = display_df.rename(
-    columns={
-        "final_score": "Score",
-        "avg_rating": "Avg Rating",
-        "review_count": "Reviews",
-        "negative_ratio": "Negative Ratio",
-    }
+available_columns = [
+    col for col in display_columns.keys()
+    if col in top_products.columns
+]
+
+display_df = top_products[available_columns].rename(
+    columns=display_columns
 )
 
 st.dataframe(display_df, use_container_width=True)
@@ -107,23 +140,25 @@ st.subheader("AI Executive Report")
 
 if st.button("Generate Executive Report"):
     with st.spinner("Generating AI-powered report..."):
-        report_text = generate_report(cluster_id, cluster_df)
+        try:
+            report_text = generate_report(cluster_id, cluster_df)
+            st.markdown(report_text)
 
-    st.markdown(report_text)
+            # PDF Download
+            pdf_buffer = io.BytesIO()
+            pdf_buffer.write(report_text.encode("utf-8"))
+            pdf_buffer.seek(0)
 
-    # -----------------------------
-    # PDF Download
-    # -----------------------------
-    pdf_buffer = io.BytesIO()
-    pdf_buffer.write(report_text.encode("utf-8"))
-    pdf_buffer.seek(0)
+            st.download_button(
+                label="Download Report as PDF",
+                data=pdf_buffer,
+                file_name=f"{selected_category}_Report.pdf",
+                mime="application/pdf"
+            )
 
-    st.download_button(
-        label="Download Report as PDF",
-        data=pdf_buffer,
-        file_name=f"{selected_category}_Report.pdf",
-        mime="application/pdf"
-    )
+        except Exception as e:
+            st.error("Error generating report.")
+            st.stop()
 
 # -----------------------------
 # Footer
