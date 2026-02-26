@@ -1,120 +1,145 @@
 import os
 import json
-from dotenv import load_dotenv
+import pandas as pd
+import streamlit as st
 from openai import OpenAI
 
-PROCESSED_DIR = "data/processed"
 
-load_dotenv()
+# ================================
+# OPENAI CLIENT LOADER
+# ================================
 
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+def get_openai_client():
+    """
+    Loads OpenAI API key from:
+    1. Local environment variable
+    2. Streamlit Cloud secrets
+    """
+
+    api_key = os.getenv("OPENAI_API_KEY")
+
+    if not api_key:
+        try:
+            api_key = st.secrets["OPENAI_API_KEY"]
+        except Exception:
+            raise ValueError("OPENAI_API_KEY not found in environment or Streamlit secrets.")
+
+    return OpenAI(api_key=api_key)
 
 
-def build_structured_context(cluster_id, cluster_df):
+# ================================
+# JSON SERIALIZATION FIX
+# ================================
 
-    top3 = cluster_df.sort_values("cluster_rank").head(3)
-    worst = cluster_df.sort_values(
-        "cluster_rank", ascending=False
-    ).head(1)
+def convert_numpy(obj):
+    """
+    Converts numpy types to native Python types
+    so they can be JSON serialized.
+    """
+    if hasattr(obj, "item"):
+        return obj.item()
+    return obj
 
-    context = {
-        "category_id": int(cluster_id),
-        "top_products": [],
-        "worst_product": {}
-    }
 
-    for _, row in top3.iterrows():
-        context["top_products"].append({
-            "asin": str(row["asin"]),
-            "score": float(row["final_score"]),
-            "review_count": int(row["review_count"]),
-            "avg_rating": float(row["avg_rating"]),
-            "negative_ratio": float(row["negative_ratio"])
-        })
-
-    for _, row in worst.iterrows():
-        context["worst_product"] = {
-            "asin": str(row["asin"]),
-            "score": float(row["final_score"]),
-            "negative_ratio": float(row["negative_ratio"])
-        }
-
-    return context
-
+# ================================
+# REPORT GENERATION
+# ================================
 
 def generate_report(cluster_id, cluster_df):
+    """
+    Generates executive + blog-style report
+    for a specific product cluster.
+    """
 
-    context = build_structured_context(cluster_id, cluster_df)
+    client = get_openai_client()
 
-    system_prompt = """
-You are a senior consumer technology analyst writing for a professional audience.
-Write high-quality, polished, publication-ready content.
-Be analytical, balanced, and clear.
-"""
+    # Sort cluster
+    cluster_df = cluster_df.sort_values("cluster_rank")
 
-    user_prompt = f"""
-Using the structured data below, create:
+    # Top 3 products
+    top_products = cluster_df.head(3)
 
-1) Executive Brief (concise bullet format)
-2) Blog Article (professional, engaging, structured)
+    # Worst product (lowest final score)
+    worst_product = cluster_df.sort_values("final_score").head(1)
 
-Data:
+    context = {
+        "cluster_id": int(cluster_id),
+        "top_products": top_products[
+            ["asin", "final_score", "review_count", "avg_rating", "negative_ratio"]
+        ].applymap(convert_numpy).to_dict(orient="records"),
+        "worst_product": worst_product[
+            ["asin", "final_score", "review_count", "avg_rating", "negative_ratio"]
+        ].applymap(convert_numpy).to_dict(orient="records")[0],
+    }
+
+    prompt = f"""
+You are an AI business analyst.
+
+Using the structured product data below, generate:
+
+SECTION 1 — Executive Brief (bullet points, concise)
+SECTION 2 — Blog Article (engaging, structured, buying advice)
+
+Context:
 {json.dumps(context, indent=2)}
 
-Include:
-- Key strengths
-- Key weaknesses
-- Differences between top 3
-- Buying guidance
-- Why the worst product underperforms
+Requirements:
+- Explain key strengths
+- Explain weaknesses
+- Compare top 3 products clearly
+- Provide buying guidance
+- Explain why worst product should be avoided
+- Professional corporate tone
 """
 
     response = client.chat.completions.create(
         model="gpt-4o-mini",
         messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt}
+            {"role": "system", "content": "You are a professional business intelligence analyst."},
+            {"role": "user", "content": prompt}
         ],
-        temperature=0.4
+        temperature=0.4,
+        max_tokens=900
     )
 
     return response.choices[0].message.content
 
 
+# ================================
+# BULK GENERATION (Optional CLI use)
+# ================================
+
 def generate_reports(ranked_df):
+    """
+    Generates reports for all clusters.
+    Used in main.py pipeline.
+    """
 
     print("\nGenerating AI reports via OpenAI...")
 
-    cluster_ids = sorted(ranked_df["cluster"].unique())
-    all_reports = []
+    clusters = sorted(ranked_df["cluster"].unique())
 
-    for cluster_id in cluster_ids:
+    full_output = ""
 
-        cluster_df = ranked_df[
-            ranked_df["cluster"] == cluster_id
-        ]
+    for cluster_id in clusters:
+        cluster_df = ranked_df[ranked_df["cluster"] == cluster_id]
 
-        output = generate_report(cluster_id, cluster_df)
+        print(f"Generating report for cluster {cluster_id}...")
 
-        report_text = f"""
-====================================
-CATEGORY {cluster_id} REPORT
-====================================
+        report = generate_report(cluster_id, cluster_df)
 
-{output}
+        full_output += (
+            "\n====================================\n"
+            f"CATEGORY {cluster_id} REPORT\n"
+            "====================================\n\n"
+            f"{report}\n\n"
+        )
 
-"""
+    output_path = "data/processed/generated_reports.txt"
 
-        print(report_text)
-        all_reports.append(report_text)
-
-    os.makedirs(PROCESSED_DIR, exist_ok=True)
-
-    with open(
-        f"{PROCESSED_DIR}/generated_reports.txt",
-        "w",
-        encoding="utf-8"
-    ) as f:
-        f.writelines(all_reports)
+    with open(output_path, "w", encoding="utf-8") as f:
+        f.write(full_output)
 
     print("Saved generated_reports.txt")
+
+    return full_output
