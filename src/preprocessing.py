@@ -26,7 +26,6 @@ def load_and_filter_data() -> pd.DataFrame:
 
     print("Loading Amazon Electronics dataset...")
 
-    # IMPORTANT: split is 'full', not 'train'
     dataset = load_dataset(
         "McAuley-Lab/Amazon-Reviews-2023",
         "raw_review_Electronics",
@@ -36,8 +35,8 @@ def load_and_filter_data() -> pd.DataFrame:
 
     df = pd.DataFrame(dataset)
 
-    # Keep only required columns
-    df = df[["asin", "rating", "text"]].dropna()
+    # ✅ PRESERVE PRODUCT TITLE
+    df = df[["asin", "title", "rating", "text"]].dropna()
 
     print(f"Initial dataset size: {len(df)}")
 
